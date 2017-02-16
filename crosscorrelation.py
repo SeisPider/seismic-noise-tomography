@@ -115,8 +115,8 @@ if any(MULTIPROCESSING.values()):
 # ====================================================
 
 from pysismo.psconfig import (
-    MSEED_DIR, DATALESS_DIR, STATIONXML_DIR, CROSSCORR_DIR,
-    USE_DATALESSPAZ, USE_STATIONXML, CROSSCORR_STATIONS_SUBSET, CROSSCORR_SKIPLOCS,
+    MSEED_DIR, DATALESS_DIR, STATIONXML_DIR, RESP_DIR,CROSSCORR_DIR,
+    USE_DATALESSPAZ, USE_STATIONXML,USE_COMBINATION,CROSSCORR_STATIONS_SUBSET, CROSSCORR_SKIPLOCS,
     FIRSTDAY, LASTDAY, MINFILL, FREQMIN, FREQMAX, CORNERS, ZEROPHASE, PERIOD_RESAMPLE,
     ONEBIT_NORM, FREQMIN_EARTHQUAKE, FREQMAX_EARTHQUAKE, WINDOW_TIME, WINDOW_FREQ,
     CROSSCORR_TMAX)
@@ -125,6 +125,7 @@ print "\nProcessing parameters:"
 print "- dir of miniseed data: " + MSEED_DIR
 print "- dir of dataless seed data: " + DATALESS_DIR
 print "- dir of stationXML data: " + STATIONXML_DIR
+print "- dir of RESP files:" + RESP_DIR
 print "- output dir: " + CROSSCORR_DIR
 print "- band-pass: {:.1f}-{:.1f} s".format(1.0 / FREQMAX, 1.0 / FREQMIN)
 if ONEBIT_NORM:
@@ -152,6 +153,8 @@ if USE_DATALESSPAZ:
     responsefrom.append('datalesspaz')
 if USE_STATIONXML:
     responsefrom.append('xmlresponse')
+if USE_COMBINATION:
+    responsefrom.append("RESPresponse")
 OUTBASENAME_PARTS = [
     'xcorr',
     '-'.join(s for s in CROSSCORR_STATIONS_SUBSET) if CROSSCORR_STATIONS_SUBSET else None,
@@ -162,7 +165,8 @@ OUTBASENAME_PARTS = [
 OUTFILESPATH = os.path.join(CROSSCORR_DIR, '_'.join(p for p in OUTBASENAME_PARTS if p))
 
 print 'Default name of output files (without extension):\n"{}"\n'.format(OUTFILESPATH)
-suffix = raw_input("Enter suffix to append: [none]\n")
+#suffix = raw_input("Enter suffix to append: [none]\n")
+suffix="first"
 if suffix:
     OUTFILESPATH = u'{}_{}'.format(OUTFILESPATH, suffix)
 print 'Results will be exported to files:\n"{}" (+ extension)\n'.format(OUTFILESPATH)
@@ -183,6 +187,15 @@ xml_inventories = []
 if USE_STATIONXML:
     xml_inventories = psstation.get_stationxml_inventories(STATIONXML_DIR,
                                                            verbose=True)
+
+xml_inventories = []
+resp_filepath = []
+if USE_COMBINATION:
+    xml_inventories = psstation.get_stationxml_inventories(STATIONXML_DIR,
+                                                            verbose=True)
+    # Reading RESP filenames into one list
+    resp_filepath = psstation.get_RESP_filelists(RESP_DIR,verbose=False)
+
 
 # Getting list of stations
 print
@@ -250,7 +263,7 @@ for date in dates:
 
         return trace
 
-    def preprocessed_trace((trace, response)):
+    def preprocessed_trace((trace, response),resp_file_path=None):
         """
         Preparing func that returns processed trace: processing includes
         removal of instrumental response, band-pass filtering, demeaning,
@@ -259,15 +272,16 @@ for date in dates:
 
         Function is ready to be parallelized.
         """
-        if not trace or response is False:
+        if (not trace or response is False) and resp_file_path:
             return
-
+        print "It's me"
         network = trace.stats.network
         station = trace.stats.station
         try:
             pscrosscorr.preprocess_trace(
                 trace=trace,
                 paz=response,
+                resp_filelist=resp_file_path,
                 freqmin=FREQMIN,
                 freqmax=FREQMAX,
                 freqmin_earthquake=FREQMIN_EARTHQUAKE,
@@ -288,13 +302,14 @@ for date in dates:
             # unhandled exception!
             trace = None
             msg = 'Unhandled error: {}'.format(err)
-
-        # printing output (error or ok) message
+            # printing output (error or ok) message
         print '{}.{} [{}] '.format(network, station, msg),
 
         # although processing is performed in-place, trace is returned
         # in order to get it back after multi-processing
         return trace
+
+
 
     # ====================================
     # getting one merged trace per station
@@ -311,55 +326,58 @@ for date in dates:
         # multiprocessing turned off: processing stations one after another
         traces = [get_merged_trace(s) for s in month_stations]
 
+
     # =====================================================
     # getting or attaching instrumental response
     # (parallelization is difficult because of inventories)
     # =====================================================
-
     responses = []
-    for tr in traces:
-        if not tr:
-            responses.append(None)
-            continue
+    if not USE_COMBINATION:
+        for tr in traces:
+            if not tr:
+                responses.append(None)
+                continue
 
         # responses elements can be (1) dict of PAZ if response found in
         # dataless inventory, (2) None if response found in StationXML
         # inventory (directly attached to trace) or (3) False if no
         # response found
 
-        try:
-            response = pscrosscorr.get_or_attach_response(
-                trace=tr,
-                dataless_inventories=dataless_inventories,
-                xml_inventories=xml_inventories)
-            errmsg = None
-        except pserrors.CannotPreprocess as err:
-            # response not found
-            response = False
-            errmsg = '{}: skipping'.format(err)
-        except Exception as err:
-            # unhandled exception!
-            response = False
-            errmsg = 'Unhandled error: {}'.format(err)
+            try:
+                response = pscrosscorr.get_or_attach_response(
+                    trace=tr,
+                    dataless_inventories=dataless_inventories,
+                    xml_inventories=xml_inventories)
+                errmsg = None
+            except pserrors.CannotPreprocess as err:
+                # response not found
+                response = False
+                errmsg = '{}: skipping'.format(err)
+            except Exception as err:
+                # unhandled exception!
+                response = False
+                errmsg = 'Unhandled error: {}'.format(err)
 
-        responses.append(response)
-        if errmsg:
-            # printing error message
-            print '{}.{} [{}] '.format(tr.stats.network, tr.stats.station, errmsg),
+            responses.append(response)
+            if errmsg:
+                # printing error message
+                print '{}.{} [{}] '.format(tr.stats.network, tr.stats.station, errmsg),
 
     # =================
     # processing traces
     # =================
-
-    if MULTIPROCESSING['process trace']:
-        # multiprocessing turned on: one process per station
-        pool = mp.Pool(NB_PROCESSES)
-        traces = pool.map(preprocessed_trace, zip(traces, responses))
-        pool.close()
-        pool.join()
+    if not USE_COMBINATION:
+        if MULTIPROCESSING['process trace']:
+            # multiprocessing turned on: one process per station
+            pool = mp.Pool(NB_PROCESSES)
+            traces = pool.map(preprocessed_trace, zip(traces, responses))
+            pool.close()
+            pool.join()
+        else:
+            # multiprocessing turned off: processing stations one after another
+            traces = [preprocessed_trace((tr, res)) for tr, res in zip(traces, responses)]
     else:
-        # multiprocessing turned off: processing stations one after another
-        traces = [preprocessed_trace((tr, res)) for tr, res in zip(traces, responses)]
+        traces = [preprocessed_trace((tr,responses),resp_file_path=resp_filepath) for tr in traces]
 
     # setting up dict of current date's traces, {station: trace}
     tracedict = {s.name: trace for s, trace in zip(month_stations, traces) if trace}

@@ -26,6 +26,7 @@ import copy
 from collections import OrderedDict
 import datetime as dt
 from calendar import monthrange
+import re
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
@@ -2357,7 +2358,8 @@ def get_or_attach_response(trace, dataless_inventories=(), xml_inventories=()):
                 raise pserrors.CannotPreprocess("No response found")
 
 
-def preprocess_trace(trace, paz=None, freqmin=FREQMIN, freqmax=FREQMAX,
+def preprocess_trace(trace, paz=None,resp_filelist=None,
+                     freqmin=FREQMIN, freqmax=FREQMAX,
                      freqmin_earthquake=FREQMIN_EARTHQUAKE,
                      freqmax_earthquake=FREQMAX_EARTHQUAKE,
                      corners=CORNERS, zerophase=ZEROPHASE,
@@ -2405,6 +2407,10 @@ def preprocess_trace(trace, paz=None, freqmin=FREQMIN, freqmax=FREQMAX,
     # Removing instrument response, mean and trend
     # ============================================
 
+    # downsampling trace if not already done
+    if abs(1.0 / trace.stats.sampling_rate - period_resample) > EPS:
+        psutils.resample(trace, dt_resample=period_resample)
+
     # removing response...
     if paz:
         # ...using paz:
@@ -2417,6 +2423,18 @@ def preprocess_trace(trace, paz=None, freqmin=FREQMIN, freqmax=FREQMAX,
                        remove_sensitivity=True,
                        simulate_sensitivity=True,
                        nfft_pow2=True)
+    elif resp_filelist:
+        # ...using RESP files:
+        # Here set up a function to remove instrumental response(line 2524)
+        # following this function
+        # set the freqmin as freqcora and max as freqcorb
+        print "The RESP files are useful!"
+        freqcora = freqmin
+        freqcorb = freqmax
+        freq_min_RESP = freqmin-0.001
+        freq_max_RESP = freqmax+5
+        RESP_remove_response(trace,resp_filelist,freq_min_RESP,
+                               freqcora,freqcorb,freq_max_RESP)
     else:
         # ...using StationXML:
         # first band-pass to downsample data before removing response
@@ -2453,9 +2471,6 @@ def preprocess_trace(trace, paz=None, freqmin=FREQMIN, freqmax=FREQMAX,
                  corners=corners,
                  zerophase=zerophase)
 
-    # downsampling trace if not already done
-    if abs(1.0 / trace.stats.sampling_rate - period_resample) > EPS:
-        psutils.resample(trace, dt_resample=period_resample)
 
     # ==================
     # Time normalization
@@ -2514,6 +2529,49 @@ def preprocess_trace(trace, paz=None, freqmin=FREQMIN, freqmax=FREQMAX,
     # Verifying that we don't have nan in trace data
     if np.any(np.isnan(trace.data)):
         raise pserrors.CannotPreprocess("Got NaN in trace data")
+
+def RESP_remove_response(trace,resp_filelist,freqmin,freqcora,freqcorb,freqmax):
+    """
+    remove instrument response with resp files
+
+    @type trace: trace
+    @type resp_filist: list of strings
+    @type freqmin: float
+    @type freqcora: float
+    @type freqcorb: float
+    @type freqmax: float
+    """
+    station_name = trace.stats.station
+    channel_name = trace.stats.channel
+    print "Program was in"
+    if not (trace and resp_filelist):
+        print "No trace or resp files!"
+        return
+    # find resp file corresponding to this trace
+    for resp_file in resp_filelist:
+        Exist = re.search(station_name,str(resp_file)) and re.search(channel_name,
+                                                                    str(resp_file))
+        if Exist:
+            # define a filter band to prevent amplifying noise during the
+            # deconvolution
+            pre_filt = (freqmin,freqcora,freqcorb,freqmax)
+
+            # This can be the date of your raw data or any date for which the
+            # SEED RESP-file is valid
+            date = trace.stats.starttime
+
+            # Create the seedresp
+            seedresp = {'filename':str(resp_file),#RESP filename
+                        # when using Trace/Stream.simulate() the "date" parameter
+                        # can also be omitted, and the starttimes of the trace
+                        # then used.
+                        'date':date,
+                        # Units to return response in ('DIS','VEL' or ACC)
+                        'units':'VEL'
+                        }
+            trace.simulate(paz_remove=None,pre_filt=pre_filt,seedresp=seedresp)
+            return trace
+
 
 
 def load_pickled_xcorr(pickle_file):
@@ -2811,7 +2869,7 @@ def optimize_dispcurve(amplmatrix, velocities, vg0, periodmask=None,
             return dispcurve_penaltyfunc(varray,
                                          amplcurvefunc(varray),
                                          strength_smoothing=strength_smoothing)
-            
+
     bounds = nperiods * [(min(velocities) + 0.1, max(velocities) - 0.1)]
     method = 'SLSQP'  # methods with bounds: L-BFGS-B, TNC, SLSQP
     resmin = minimize(fun=funcmin, x0=vg0, method=method, bounds=bounds)

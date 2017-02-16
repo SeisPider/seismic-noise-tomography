@@ -19,7 +19,7 @@ import numpy as np
 # ====================================================
 # parsing configuration file to import some parameters
 # ====================================================
-from psconfig import MSEED_DIR, STATIONXML_DIR, DATALESS_DIR
+from psconfig import MSEED_DIR, STATIONXML_DIR, DATALESS_DIR,RESP_DIR
 
 
 class Station:
@@ -326,6 +326,35 @@ def get_stationxml_inventories(stationxml_dir=STATIONXML_DIR, verbose=False):
         print
 
     return inventories
+
+
+def get_RESP_filelists(resp_filepath=RESP_DIR,verbose=True):
+    """
+    Reads response given by RESP files whose names organized as RESP.<network>.<station>.<channel>
+    e.g:RESP.XJ.AKS.BHZ
+    """
+    resp_filepath = []
+
+    # list of RESP* files
+    flist = glob.glob(pathname=os.path.join(RESP_DIR,"RESP*"))
+
+    if verbose:
+        if flist:
+            print "Scanning RESP files"
+        else:
+            s = u"Could not find any RESP file (RESP*) in dir:{}!"
+            print s.format(RESP_DIR)
+
+    for f in flist:
+        if verbose:
+            print os.path.basename(f)
+        resp_filepath.append(str(f))
+
+    if flist and verbose:
+        print "RESP files scanning finished Suc!"
+
+    return resp_filepath
+
 
 
 def get_dataless_inventories(dataless_dir=DATALESS_DIR, verbose=False):
