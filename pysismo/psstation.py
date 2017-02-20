@@ -336,7 +336,7 @@ def get_RESP_filelists(resp_filepath=RESP_DIR,verbose=True):
     resp_filepath = []
 
     # list of RESP* files
-    flist = glob.glob(pathname=os.path.join(RESP_DIR,"RESP*"))
+    flist = glob.glob(pathname=os.path.join(RESP_DIR,"*RESP*"))
 
     if verbose:
         if flist:

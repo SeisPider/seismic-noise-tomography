@@ -166,7 +166,7 @@ OUTFILESPATH = os.path.join(CROSSCORR_DIR, '_'.join(p for p in OUTBASENAME_PARTS
 
 print 'Default name of output files (without extension):\n"{}"\n'.format(OUTFILESPATH)
 #suffix = raw_input("Enter suffix to append: [none]\n")
-suffix="first"
+suffix=sys.argv[1]
 if suffix:
     OUTFILESPATH = u'{}_{}'.format(OUTFILESPATH, suffix)
 print 'Results will be exported to files:\n"{}" (+ extension)\n'.format(OUTFILESPATH)
@@ -188,9 +188,9 @@ if USE_STATIONXML:
     xml_inventories = psstation.get_stationxml_inventories(STATIONXML_DIR,
                                                            verbose=True)
 
-xml_inventories = []
 resp_filepath = []
 if USE_COMBINATION:
+    xml_inventories=[]
     xml_inventories = psstation.get_stationxml_inventories(STATIONXML_DIR,
                                                             verbose=True)
     # Reading RESP filenames into one list
@@ -198,6 +198,10 @@ if USE_COMBINATION:
 
 
 # Getting list of stations
+# -------------------------------
+# COMP: Using stationxml file to
+#   support location information
+# -------------------------------
 print
 stations = psstation.get_stations(mseed_dir=MSEED_DIR,
                                   xml_inventories=xml_inventories,
@@ -272,9 +276,12 @@ for date in dates:
 
         Function is ready to be parallelized.
         """
-        if (not trace or response is False) and resp_file_path:
+        if not trace:
             return
-        print "It's me"
+        #if not (response or resp_file_path):
+        #    return
+        print "Preprocessing.",trace
+
         network = trace.stats.network
         station = trace.stats.station
         try:
@@ -309,7 +316,14 @@ for date in dates:
         # in order to get it back after multi-processing
         return trace
 
-
+    # ====================================
+    # multiple parameters for map function
+    # ====================================
+    def universal_worker(input_pair):
+        function,args = input_pair
+        return function(*args)
+    def pool_args(function,*args):
+        return zip(it.repeat(function),zip(*args))
 
     # ====================================
     # getting one merged trace per station
@@ -331,8 +345,8 @@ for date in dates:
     # getting or attaching instrumental response
     # (parallelization is difficult because of inventories)
     # =====================================================
-    responses = []
     if not USE_COMBINATION:
+        responses = []
         for tr in traces:
             if not tr:
                 responses.append(None)
@@ -377,7 +391,16 @@ for date in dates:
             # multiprocessing turned off: processing stations one after another
             traces = [preprocessed_trace((tr, res)) for tr, res in zip(traces, responses)]
     else:
-        traces = [preprocessed_trace((tr,responses),resp_file_path=resp_filepath) for tr in traces]
+        responses = []
+        if MULTIPROCESSING['process trace']:
+            #multiprocess truned on: one process per station
+            print "MULTIPROCESSING"
+            pool = mp.Pool(NB_PROCESSES)
+            traces = pool.map(universal_worker,pool_args(preprocessed_trace,zip(traces,it.repeat(responses)),resp_filepath))
+            pool.close()
+            pool.join()
+        else:
+            traces = [preprocessed_trace((tr,responses),resp_file_path=resp_filepath) for tr in traces]
 
     # setting up dict of current date's traces, {station: trace}
     tracedict = {s.name: trace for s, trace in zip(month_stations, traces) if trace}

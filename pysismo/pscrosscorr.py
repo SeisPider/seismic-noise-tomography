@@ -2543,14 +2543,19 @@ def RESP_remove_response(trace,resp_filelist,freqmin,freqcora,freqcorb,freqmax):
     """
     station_name = trace.stats.station
     channel_name = trace.stats.channel
-    print "Program was in"
+    channel_mont = trace.stats.endtime.month
+    channel_year = trace.stats.endtime.year
+    channel_day  = trace.stats.starttime.day
+    year_month_day = str(channel_year)+"{:0>2d}".format(channel_mont)+"{:0>2d}".format(channel_day)
+
+    print "Program was in  "+year_month_day
     if not (trace and resp_filelist):
         print "No trace or resp files!"
         return
     # find resp file corresponding to this trace
     for resp_file in resp_filelist:
-        Exist = re.search(station_name,str(resp_file)) and re.search(channel_name,
-                                                                    str(resp_file))
+        Exist = re.search(station_name,str(resp_file)) and re.search(channel_name, \
+                    str(resp_file))  and re.search(year_month_day,str(resp_file))
         if Exist:
             # define a filter band to prevent amplifying noise during the
             # deconvolution
