@@ -151,7 +151,7 @@ USE_STATIONXML = False           ; use stationXML files to remove instrument res
 USE_COMBINATION = True              ; use combination of stationxml and RESP files?
 
 FIRSTDAY = 1/1/2016                 ; first day of cross-correlation (d/m/y)
-LASTDAY = 31/12/2016                 ; last day of cross-correlation (d/m/y)
+LASTDAY = 31/1/2016                 ; last day of cross-correlation (d/m/y)
 MINFILL = 0.99                      ; minimum data fill within day
 
 CROSSCORR_STATIONS_SUBSET = null    ; subset of stations (null if all, else JSON list)
@@ -159,14 +159,14 @@ CROSSCORR_TMAX = 2000               ; max time window (s) for cross-correlation
 CROSSCORR_SKIPLOCS = ["50"]         ; locations to skip (JSON list)
 
 PERIODMIN = 3.0                     ; bandpass parameters
-PERIODMAX = 150.0
+PERIODMAX = 60.0
 CORNERS = 2
 ZEROPHASE = True
 PERIOD_RESAMPLE = 1.0               ; resample period to decimate traces, after band-pass
 
 ONEBIT_NORM = False                 ; one-bit normalization?
-PERIODMIN_EARTHQUAKE = 7.0         ; earthquakes periods band
-PERIODMAX_EARTHQUAKE = 100.0
+PERIODMIN_EARTHQUAKE = 15.0         ; earthquakes periods band
+PERIODMAX_EARTHQUAKE = 50.0
 
 WINDOW_FREQ = 0.0002                ; freq window (Hz) to smooth ampl spectrum
 

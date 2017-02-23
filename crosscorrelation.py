@@ -396,7 +396,7 @@ for date in dates:
             #multiprocess truned on: one process per station
             print "MULTIPROCESSING"
             pool = mp.Pool(NB_PROCESSES)
-            traces = pool.map(universal_worker,pool_args(preprocessed_trace,zip(traces,it.repeat(responses)),resp_filepath))
+            traces = pool.map(universal_worker,pool_args(preprocessed_trace,zip(traces,it.repeat(responses)),it.repeat(resp_filepath)))
             pool.close()
             pool.join()
         else:

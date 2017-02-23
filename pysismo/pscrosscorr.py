@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import gridspec
-
+import datetime as dt
 plt.ioff()  # turning off interactive mode
 
 # ====================================================
@@ -2543,10 +2543,8 @@ def RESP_remove_response(trace,resp_filelist,freqmin,freqcora,freqcorb,freqmax):
     """
     station_name = trace.stats.station
     channel_name = trace.stats.channel
-    channel_mont = trace.stats.endtime.month
-    channel_year = trace.stats.endtime.year
-    channel_day  = trace.stats.starttime.day
-    year_month_day = str(channel_year)+"{:0>2d}".format(channel_mont)+"{:0>2d}".format(channel_day)
+    resp_time = trace.stats.starttime+dt.timedelta(days=1)
+    year_month_day = str(resp_time.year)+"{:0>2d}".format(resp_time.month)+"{:0>2d}".format(resp_time.day)
 
     print "Program was in  "+year_month_day
     if not (trace and resp_filelist):
@@ -2564,6 +2562,8 @@ def RESP_remove_response(trace,resp_filelist,freqmin,freqcora,freqcorb,freqmax):
             # This can be the date of your raw data or any date for which the
             # SEED RESP-file is valid
             date = trace.stats.starttime
+            if os.path.isfile(resp_file):
+                print "RESP file {0} Exists".format(resp_file)
 
             # Create the seedresp
             seedresp = {'filename':str(resp_file),#RESP filename
@@ -2575,6 +2575,7 @@ def RESP_remove_response(trace,resp_filelist,freqmin,freqcora,freqcorb,freqmax):
                         'units':'VEL'
                         }
             trace.simulate(paz_remove=None,pre_filt=pre_filt,seedresp=seedresp)
+            print "Instrument response has been removed"
             return trace
 
 
