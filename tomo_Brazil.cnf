@@ -82,6 +82,7 @@ MSEED_DIR = ../MINISEEDData
 STATIONXML_DIR = ../stationxml_files
 DATALESS_DIR = ../Dataless seed
 RESP_DIR = ../RESP_file
+SACPZ_DIR = ../POLES_ZEROS_file
 
 CROSSCORR_DIR = ../output/cross-correlation  ; dir of cross-correlation results
 FTAN_DIR = ../output/FTAN                    ; dir of FTAN results (including dispersion curves)
@@ -149,24 +150,26 @@ BBOX_SMALL = [-65, -35, -29, 1]
 USE_DATALESSPAZ = False             ; use dataless files to remove instrument response?
 USE_STATIONXML = False           ; use stationXML files to remove instrument response?
 USE_COMBINATION = True              ; use combination of stationxml and RESP files?
+USE_COMBINATION_RESP = False        ; Use resp to combination else use sac PZ files
 
 FIRSTDAY = 1/1/2016                 ; first day of cross-correlation (d/m/y)
 LASTDAY = 31/12/2016                 ; last day of cross-correlation (d/m/y)
 MINFILL = 0.99                      ; minimum data fill within day
 
 CROSSCORR_STATIONS_SUBSET = null    ; subset of stations (null if all, else JSON list)
+CROSS_STATIONS_DELETE = ["SSH","DSZ"] ; subset of stations (null if None, else JSON list)
 CROSSCORR_TMAX = 2000               ; max time window (s) for cross-correlation
 CROSSCORR_SKIPLOCS = ["50"]         ; locations to skip (JSON list)
 
 PERIODMIN = 3.0                     ; bandpass parameters
-PERIODMAX = 150.0
+PERIODMAX = 60.0
 CORNERS = 2
 ZEROPHASE = True
 PERIOD_RESAMPLE = 1.0               ; resample period to decimate traces, after band-pass
 
 ONEBIT_NORM = False                 ; one-bit normalization?
-PERIODMIN_EARTHQUAKE = 7.0         ; earthquakes periods band
-PERIODMAX_EARTHQUAKE = 100.0
+PERIODMIN_EARTHQUAKE = 15.0         ; earthquakes periods band
+PERIODMAX_EARTHQUAKE = 50.0
 
 WINDOW_FREQ = 0.0002                ; freq window (Hz) to smooth ampl spectrum
 

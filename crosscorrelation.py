@@ -98,6 +98,7 @@ import datetime as dt
 import itertools as it
 import pickle
 import obspy.signal.cross_correlation
+from termcolor import colored
 
 # turn on multiprocessing to get one merged trace per station?
 # to preprocess trace? to stack cross-correlations?
@@ -115,8 +116,8 @@ if any(MULTIPROCESSING.values()):
 # ====================================================
 
 from pysismo.psconfig import (
-    MSEED_DIR, DATALESS_DIR, STATIONXML_DIR, RESP_DIR,CROSSCORR_DIR,
-    USE_DATALESSPAZ, USE_STATIONXML,USE_COMBINATION,CROSSCORR_STATIONS_SUBSET, CROSSCORR_SKIPLOCS,
+    MSEED_DIR, DATALESS_DIR, STATIONXML_DIR, RESP_DIR,CROSSCORR_DIR,SACPZ_DIR,
+    USE_DATALESSPAZ, USE_STATIONXML,USE_COMBINATION,CROSSCORR_STATIONS_SUBSET, CROSSCORR_SKIPLOCS,USE_COMBINATION_RESP,CROSS_STATIONS_DELETE,
     FIRSTDAY, LASTDAY, MINFILL, FREQMIN, FREQMAX, CORNERS, ZEROPHASE, PERIOD_RESAMPLE,
     ONEBIT_NORM, FREQMIN_EARTHQUAKE, FREQMAX_EARTHQUAKE, WINDOW_TIME, WINDOW_FREQ,
     CROSSCORR_TMAX)
@@ -154,7 +155,11 @@ if USE_DATALESSPAZ:
 if USE_STATIONXML:
     responsefrom.append('xmlresponse')
 if USE_COMBINATION:
-    responsefrom.append("RESPresponse")
+    # Choose which one to append
+    if USE_COMBINATION_RESP:
+        responsefrom.append("RESPresponse")
+
+    responsefrom.append("POLEZEROresponse")
 OUTBASENAME_PARTS = [
     'xcorr',
     '-'.join(s for s in CROSSCORR_STATIONS_SUBSET) if CROSSCORR_STATIONS_SUBSET else None,
@@ -193,8 +198,14 @@ if USE_COMBINATION:
     xml_inventories=[]
     xml_inventories = psstation.get_stationxml_inventories(STATIONXML_DIR,
                                                             verbose=True)
-    # Reading RESP filenames into one list
-    resp_filepath = psstation.get_RESP_filelists(RESP_DIR,verbose=False)
+
+    # Reading RESP or SACPZ filenames into one list
+    if USE_COMBINATION_RESP:
+        resp_filepath = psstation.get_RESP_filelists(RESP_DIR,verbose=False)
+    else:
+        resp_filepath = psstation.get_SACPZ_filelists(SACPZ_DIR,verbose=False)
+
+
 
 
 # Getting list of stations
@@ -203,12 +214,33 @@ if USE_COMBINATION:
 #   support location information
 # -------------------------------
 print
-stations = psstation.get_stations(mseed_dir=MSEED_DIR,
+stations_all = psstation.get_stations(mseed_dir=MSEED_DIR,
                                   xml_inventories=xml_inventories,
                                   dataless_inventories=dataless_inventories,
                                   startday=FIRSTDAY,
                                   endday=LASTDAY,
                                   verbose=True)
+
+# Filter stations to delete subset of stations in *CROSS_STATIONS_DELETE*
+if CROSS_STATIONS_DELETE:
+    # initial stations list
+    stations = []
+
+    # check all stations wheather they are in list *CROSS_STATIONS_DELETE*
+    for station in stations_all:
+
+        Exist = station.name in CROSS_STATIONS_DELETE
+        if Exist:
+            print colored("Delet {} ".format(station.name),'red')
+            continue
+        stations.append(station)
+else:
+    # Don't delete any station
+    stations = stations_all
+
+print colored("ALL {} stations".format(str(len(stations))),'green')
+
+
 
 # Initializing collection of cross-correlations
 xc = pscrosscorr.CrossCorrelationCollection()

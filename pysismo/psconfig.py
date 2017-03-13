@@ -60,6 +60,7 @@ MSEED_DIR = config.get('paths', 'MSEED_DIR')
 STATIONXML_DIR = config.get('paths', 'STATIONXML_DIR')
 DATALESS_DIR = config.get('paths', 'DATALESS_DIR')
 RESP_DIR = config.get('paths','RESP_DIR')
+SACPZ_DIR = config.get('paths','SACPZ_DIR')
 
 # output dirs
 CROSSCORR_DIR = config.get('paths', 'CROSSCORR_DIR')
@@ -95,10 +96,14 @@ BBOX_SMALL = json.loads(config.get('maps', 'BBOX_SMALL'))
 USE_DATALESSPAZ = config.getboolean('cross-correlation', 'USE_DATALESSPAZ')
 USE_STATIONXML = config.getboolean('cross-correlation', 'USE_STATIONXML')
 USE_COMBINATION = config.getboolean('cross-correlation','USE_COMBINATION')
+USE_COMBINATION_RESP = config.getboolean('cross-correlation','USE_COMBINATION_RESP')
 
 # subset of stations to cross-correlate
 CROSSCORR_STATIONS_SUBSET = config.get('cross-correlation', 'CROSSCORR_STATIONS_SUBSET')
 CROSSCORR_STATIONS_SUBSET = json.loads(CROSSCORR_STATIONS_SUBSET)
+# subset of stations to be deleted from stations
+CROSS_STATIONS_DELETE = config.get('cross-correlation','CROSS_STATIONS_DELETE')
+CROSS_STATIONS_DELETE = json.loads(CROSS_STATIONS_DELETE)
 
 # locations to skip
 CROSSCORR_SKIPLOCS = json.loads(config.get('cross-correlation', 'CROSSCORR_SKIPLOCS'))

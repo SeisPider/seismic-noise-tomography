@@ -10,6 +10,7 @@ import obspy.signal
 import obspy.xseed
 import obspy.signal.cross_correlation
 import obspy.signal.filter
+from obspy.signal.invsim import simulate_seismometer
 from obspy.core import AttribDict, read, UTCDateTime, Trace
 from obspy.signal.invsim import cosTaper
 import numpy as np
@@ -33,6 +34,8 @@ import matplotlib as mpl
 from matplotlib.backends.backend_pdf import PdfPages
 from matplotlib import gridspec
 import datetime as dt
+
+from termcolor import colored # module to output colored string
 plt.ioff()  # turning off interactive mode
 
 # ====================================================
@@ -41,6 +44,7 @@ plt.ioff()  # turning off interactive mode
 from psconfig import (
     CROSSCORR_DIR, FTAN_DIR, PERIOD_BANDS, CROSSCORR_TMAX, PERIOD_RESAMPLE,
     CROSSCORR_SKIPLOCS, MINFILL, FREQMIN, FREQMAX, CORNERS, ZEROPHASE,
+    USE_COMBINATION_RESP,
     ONEBIT_NORM, FREQMIN_EARTHQUAKE, FREQMAX_EARTHQUAKE, WINDOW_TIME, WINDOW_FREQ,
     SIGNAL_WINDOW_VMIN, SIGNAL_WINDOW_VMAX, SIGNAL2NOISE_TRAIL, NOISE_WINDOW_SIZE,
     RAWFTAN_PERIODS, CLEANFTAN_PERIODS, FTAN_VELOCITIES, FTAN_ALPHA, STRENGTH_SMOOTHING,
@@ -501,7 +505,7 @@ class CrossCorrelation:
         vkwargs = {
             'fontsize': 8,
             'horizontalalignment': 'center',
-            'bbox': dict(color='k', facecolor='white')}
+            'bbox': dict(facecolor='white')}
         if vmin:
             ylim = plt.ylim()
             plt.plot(2 * [xcout.dist() / vmin], ylim, color='grey')
@@ -615,7 +619,7 @@ class CrossCorrelation:
             xy = (t, ylim[0] + 0.1 * (ylim[1] - ylim[0]))
             axlist[0].annotate(s='{} km/s'.format(v), xy=xy, xytext=xy,
                                horizontalalignment=align, fontsize=8,
-                               bbox={'color': 'k', 'facecolor': 'white'})
+                               bbox={'facecolor': 'white'})
 
         # noise window
         axlist[0].fill_between(x=tnoise, y1=[ylim[1], ylim[1]],
@@ -630,7 +634,7 @@ class CrossCorrelation:
                        s="Original data, SNR = {:.1f}".format(float(SNR)),
                        fontsize=9,
                        horizontalalignment='right',
-                       bbox={'color': 'k', 'facecolor': 'white'})
+                       bbox={'facecolor': 'white'})
 
         # formatting axes
         axlist[0].set_xlim(xlim)
@@ -678,7 +682,7 @@ class CrossCorrelation:
                     s="{} - {} s, SNR = {:.1f}".format(tmin, tmax, SNR),
                     fontsize=9,
                     horizontalalignment='right',
-                    bbox={'color': 'k', 'facecolor': 'white'})
+                    bbox={'facecolor': 'white'})
 
             if lastplot:
                 # adding label to signalwindows
@@ -695,7 +699,7 @@ class CrossCorrelation:
                         s="Noise window",
                         horizontalalignment='center',
                         fontsize=8,
-                        bbox={'color': 'k', 'facecolor': 'white'})
+                        bbox={'facecolor': 'white'})
 
             # formatting axes
             ax.set_xlim(xlim)
@@ -2428,13 +2432,25 @@ def preprocess_trace(trace, paz=None,resp_filelist=None,
         # Here set up a function to remove instrumental response(line 2524)
         # following this function
         # set the freqmin as freqcora and max as freqcorb
-        print "The RESP files are useful!"
+        # set the filter period region
         freqcora = freqmin
         freqcorb = freqmax
         freq_min_RESP = freqmin-0.001
         freq_max_RESP = freqmax+5
-        RESP_remove_response(trace,resp_filelist,freq_min_RESP,
-                               freqcora,freqcorb,freq_max_RESP)
+
+        if USE_COMBINATION_RESP:
+            print "The RESP files are useful!"
+            #RESP_remove_response(trace,resp_filelist,freq_min_RESP,
+            #                      freqcora,freqcorb,freq_max_RESP)
+            #print "However,they are not used!"
+        else:
+            # ...using SACPZ files:
+            # Here set up a function to remove instrumental response
+            # following this function
+            # set the freqmin as freqcora and max as freqcorb
+            print "SACPZ files are useful"
+            SACPZ_remove_response(trace,resp_filelist,freqmin,freqcora,freqcorb,freqmax)
+
     else:
         # ...using StationXML:
         # first band-pass to downsample data before removing response
@@ -2575,10 +2591,91 @@ def RESP_remove_response(trace,resp_filelist,freqmin,freqcora,freqcorb,freqmax):
                         'units':'VEL'
                         }
             trace.simulate(paz_remove=None,pre_filt=pre_filt,seedresp=seedresp)
-            print "Instrument response has been removed"
+            print colored("Instrument response has been removed","red")
             return trace
 
 
+def SACPZ_remove_response(trace,resp_filelist,freqmin,freqcora,freqcorb,freqmax):
+    """
+    remove instrument response with SACPZ files
+
+    @type trace: trace
+    @type resp_filist: list of strings
+    @type freqmin: float
+    @type freqcora: float
+    @type freqcorb: float
+    @type freqmax: float
+    """
+    station_name = trace.stats.station
+    channel_name = trace.stats.channel
+
+    if not (trace and resp_filelist):
+        print "No trace or SACPZ files!"
+        return
+    # find resp file corresponding to this trace
+    # output POLEZERO file number
+    s = "{} POLEZERO FILES FOUND".format(len(resp_filelist))
+    print colored(s,'green')
+    for resp_file in resp_filelist:
+        Exist = re.search(station_name,str(resp_file)) and re.search(channel_name, \
+                    str(resp_file))
+        if Exist:
+            # define a filter band to prevent amplifying noise during the
+            # deconvolution
+            pre_filt = [freqmin,freqcora,freqcorb,freqmax]
+
+            if os.path.isfile(resp_file):
+                print "SACPZ file {0} Exists".format(resp_file)
+            else:
+                print colored("No SACPZ file {} Exist".format(resp_file),'green')
+
+            paz_remove = Get_paz_remove(filename=resp_file)
+            df = trace.stats.sampling_rate
+            # add a function to Read SACPZ file
+            trace.data = simulate_seismometer(trace.data,df,paz_remove=paz_remove,pre_filt=pre_filt)
+            s = "{} Instrument response has been removed".format(station_name)
+            print colored(s,"red")
+            return trace
+
+def Get_paz_remove(filename=None):
+    """
+    Scan files from the XJ and return dicts fit for paz_remove
+
+    filename @str : full director and name of response file
+    instrument @dict: dict of sensitivity,poles,zeros and gain
+    """
+    XJ_file = open(filename,'r')
+    All_info = XJ_file.readlines()
+
+    poles = []
+    zeros = []
+    for line in All_info:
+
+        line_str = "".join(line)
+        # obtain sensitivity
+        if re.search("SENSITIVITY",line_str):
+            sensitivity = float( "".join( line_str.split()[1:2] ) )
+
+        # obtain gain
+        if re.search("AO",line_str):
+            gain = float( "".join( line_str.split()[1:2] ) )
+
+        # obtain poles
+        if re.search('POLE_\d',line_str):
+            real_part = float( "".join( line_str.split()[1:2] ) )
+            imag_part = float( "".join( line_str.split()[2:3] ) )
+            poles.append((complex(real_part,imag_part)))
+
+        # obtain zeros
+        if re.search('ZERO_\d',line_str):
+            real_part = float( "".join( line_str.split()[1:2] ) )
+            imag_part = float( "".join( line_str.split()[2:3] ) )
+            zeros.append(complex(real_part,imag_part))
+
+    instrument = {'gain': gain, 'poles': poles, 'sensitivity': sensitivity,'zeros': zeros}
+    XJ_file.close()
+
+    return instrument
 
 def load_pickled_xcorr(pickle_file):
     """

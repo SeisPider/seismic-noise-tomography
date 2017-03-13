@@ -19,7 +19,7 @@ import numpy as np
 # ====================================================
 # parsing configuration file to import some parameters
 # ====================================================
-from psconfig import MSEED_DIR, STATIONXML_DIR, DATALESS_DIR,RESP_DIR
+from psconfig import MSEED_DIR, STATIONXML_DIR, DATALESS_DIR,RESP_DIR,SACPZ_DIR
 
 
 class Station:
@@ -355,6 +355,32 @@ def get_RESP_filelists(resp_filepath=RESP_DIR,verbose=True):
 
     return resp_filepath
 
+def get_SACPZ_filelists(resp_filepath=SACPZ_DIR,verbose=True):
+    """
+    Reads response given by SACPZ files whose names organized as <year>.SAC.PZS.<network>.<station>.<channel>
+    e.g:2016.SAC.PZS.XJ.AKS.BHZ
+    """
+    resp_filepath = []
+
+    # list of RESP* files
+    flist = glob.glob(pathname=os.path.join(SACPZ_DIR,"*PZ*"))
+
+    if verbose:
+        if flist:
+            print "Scanning SACPZ files"
+        else:
+            s = u"Could not find any SACPZ file (*SAC.PZS*) in dir:{}!"
+            print s.format(SACPZ_DIR)
+
+    for f in flist:
+        if verbose:
+            print os.path.basename(f)
+        resp_filepath.append(str(f))
+
+    if flist and verbose:
+        print "SACPZ files scanning finished Suc!"
+
+    return resp_filepath
 
 
 def get_dataless_inventories(dataless_dir=DATALESS_DIR, verbose=False):

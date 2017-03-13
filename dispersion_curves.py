@@ -99,4 +99,4 @@ for pickle_file in pickle_files:
     #
     # See other options in the docstring of the function.
 
-    xc.FTANs(suffix=suffix, whiten=False, normalize_ampl=True, logscale=True)
+    xc.FTANs(suffix=suffix, whiten=False,minspectSNR=7.0,normalize_ampl=True, logscale=True)
